@@ -9,13 +9,9 @@ from pyspark.sql.functions import sum as spark_sum
 import re
 import pandas as pd
 
-
-
 sc = SparkContext()
 sqlContext = SQLContext(sc)
 spark = SparkSession(sc)
-
-
 
 m = re.finditer(r'.*?(spark).*?', "I'm searching for a spark in PySpark", re.I)
 for match in m:
@@ -59,7 +55,6 @@ content_size_pattern = r'\s(\d+)$'
 content_size = [re.search(content_size_pattern, item).group(1) for item in sample_logs]
 print(content_size)
 
-
 logs_df = base_df.select(regexp_extract('value', host_pattern, 1).alias('host'),
                          regexp_extract('value', ts_pattern, 1).alias('timestamp'),
                          regexp_extract('value', method_uri_protocol_pattern, 1).alias('method'),
@@ -67,6 +62,8 @@ logs_df = base_df.select(regexp_extract('value', host_pattern, 1).alias('host'),
                          regexp_extract('value', method_uri_protocol_pattern, 3).alias('protocol'),
                          regexp_extract('value', status_pattern, 1).cast('integer').alias('status'),
                          regexp_extract('value', content_size_pattern, 1).cast('integer').alias('content_size'))
+
+
 # logs_df.show(10, truncate=True)
 # print((logs_df.count(), len(logs_df.columns)))
 
@@ -81,6 +78,8 @@ logs_df = base_df.select(regexp_extract('value', host_pattern, 1).alias('host'),
 #
 def count_null(col_name):
     return spark_sum(col(col_name).isNull().cast('integer')).alias(col_name)
+
+
 #
 # # Build up a list of column expressions, one per column.
 # exprs = [count_null(col_name) for col_name in logs_df.columns]
@@ -98,7 +97,8 @@ bad_status_df = null_status_df.select(regexp_extract('value', host_pattern, 1).a
                                       regexp_extract('value', method_uri_protocol_pattern, 2).alias('endpoint'),
                                       regexp_extract('value', method_uri_protocol_pattern, 3).alias('protocol'),
                                       regexp_extract('value', status_pattern, 1).cast('integer').alias('status'),
-                                      regexp_extract('value', content_size_pattern, 1).cast('integer').alias('content_size'))
+                                      regexp_extract('value', content_size_pattern, 1).cast('integer').alias(
+                                          'content_size'))
 bad_status_df.show(truncate=False)
 
 logs_df = logs_df[logs_df['status'].isNotNull()]
@@ -106,10 +106,12 @@ logs_df = logs_df.na.fill({'content_size': 0})
 exprs = [count_null(col_name) for col_name in logs_df.columns]
 logs_df.agg(*exprs).show()
 from pyspark.sql.functions import udf
+
 month_map = {
-  'Jan': 1, 'Feb': 2, 'Mar':3, 'Apr':4, 'May':5, 'Jun':6, 'Jul':7,
-  'Aug':8,  'Sep': 9, 'Oct':10, 'Nov': 11, 'Dec': 12
+    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7,
+    'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
 }
+
 
 def parse_clf_time(text):
     return "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}".format(
@@ -120,6 +122,7 @@ def parse_clf_time(text):
         int(text[15:17]),
         int(text[18:20])
     )
+
 
 udf_parse_time = udf(parse_clf_time)
 logs_df = (logs_df.select('*', udf_parse_time(logs_df['timestamp']).cast('timestamp').alias('time')).drop('timestamp'))
@@ -144,26 +147,36 @@ from pyspark.sql import functions as F
 #         .toPandas())
 
 status_freq_df = (logs_df
-                     .groupBy('status')
-                     .count()
-                     .sort('status')
-                     .cache())
+                  .groupBy('status')
+                  .count()
+                  .sort('status')
+                  .cache())
 print('Total distinct HTTP Status Codes:', status_freq_df.count())
 
 status_freq_pd_df = (status_freq_df.toPandas().sort_values(by=['count'], ascending=False))
 print(status_freq_pd_df)
 
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
 # sns.catplot(x='status', y='count', data=status_freq_pd_df,
 #             kind='bar', order=status_freq_pd_df['status'])
-# plt.savefig( 'myfig.png' )
 
-host_sum_df = (logs_df.groupBy('host').count().sort('count', ascending=False).limit(10))
-host_sum_df.show(truncate=False)
+# host_sum_df = (logs_df.groupBy('host').count().sort('count', ascending=False).limit(10))
+# host_sum_df.show(truncate=False)
 
+log_freq_df = status_freq_df.withColumn('log_count', F.log(status_freq_df['count']))
+log_freq_df.show()
 
+log_freq_pd_df = log_freq_df.toPandas().sort_values(by=['log_count'], ascending=False)
+sns.catplot(x='status', y='log_count', data=log_freq_pd_df, kind='bar', order=status_freq_df['status'])
+# log_freq_pd_df = (log_freq_df
+#                   .toPandas()
+#                   .sort_values(by=['log(count)'],
+#                                ascending=False))
+# sns.catplot(x='status', y='log(count)', data=log_freq_pd_df,
+#             kind='bar', order=status_freq_pd_df['status'])
 
-
+plt.savefig('myfig.png')
 
