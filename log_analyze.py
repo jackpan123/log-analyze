@@ -29,6 +29,11 @@ print(timestamps)
 spend_time_pattern = r'(耗时：\d+:\d+:\d+\.\d+)'
 spend_time = [re.search(spend_time_pattern, item).group(1) for item in sample_normal_log]
 print(spend_time)
+
+request_uri_pattern = r'((\/\w+)+)'
+request_uri_list = [re.search(request_uri_pattern, item).group(1) for item in sample_normal_log]
+print(request_uri_list)
+
 # normal_log_df.select(
 #     regexp_extract('value', spend_time_pattern, 1).alias('spend_time'),
 #     regexp_extract('value', spend_time_pattern,  1).alias('spend_time'),
