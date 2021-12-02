@@ -34,6 +34,27 @@ request_uri_pattern = r'((\/\w+)+)'
 request_uri_list = [re.search(request_uri_pattern, item).group(1) for item in sample_normal_log]
 print(request_uri_list)
 
+# 最大内存
+max_memory_pattern = r'(最大内存: \d+m)'
+max_memory_list = [re.search(max_memory_pattern, item).group(1) for item in sample_normal_log]
+print(max_memory_list)
+
+# 已分配内存
+already_allow_memory_pattern = r'(已分配内存: \d+m)'
+already_allow_memory_list = [re.search(already_allow_memory_pattern, item).group(1) for item in sample_normal_log]
+print(already_allow_memory_list)
+
+# 已分配内存中的剩余空间
+already_allow_memory_free_pattern = r'(已分配内存中的剩余空间: \d+m)'
+already_allow_memory_free_list = [re.search(already_allow_memory_free_pattern, item).group(1) for item in sample_normal_log]
+print(already_allow_memory_free_list)
+
+
+# 最大可用内存
+max_useful_memory_free_pattern = r'(最大可用内存: \d+m)'
+already_allow_memory_free_list = [re.search(max_useful_memory_free_pattern, item).group(1) for item in sample_normal_log]
+print(already_allow_memory_free_list)
+
 # normal_log_df.select(
 #     regexp_extract('value', spend_time_pattern, 1).alias('spend_time'),
 #     regexp_extract('value', spend_time_pattern,  1).alias('spend_time'),
