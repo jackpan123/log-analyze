@@ -81,5 +81,8 @@ performance_log_df = normal_log_df.select(
 
 # performance_log_df.show(10, truncate=False)
 
-performance_log_df.select(hour(col('time')).alias('hour'))\
-    .groupBy('hour').count().orderBy('hour').show()
+# performance_log_df.select(hour(col('time')).alias('hour'))\
+#     .groupBy('hour').count().orderBy('hour').show()
+
+performance_log_df.select(col('time')).groupBy(window(col('time'), '1 minutes')).count().orderBy('window').show(100, truncate=False)
+
