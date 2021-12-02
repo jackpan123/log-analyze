@@ -3,6 +3,7 @@ from pyspark.sql.context import SQLContext
 from pyspark.sql.session import SparkSession
 from pyspark.sql.functions import col
 from pyspark.sql.functions import regexp_extract
+from pyspark.sql.functions import regexp_replace
 from pyspark.sql.functions import sum as spark_sum
 import re
 import pandas as pd
@@ -55,8 +56,18 @@ max_useful_memory_free_pattern = r'(最大可用内存: \d+m)'
 already_allow_memory_free_list = [re.search(max_useful_memory_free_pattern, item).group(1) for item in sample_normal_log]
 print(already_allow_memory_free_list)
 
-# normal_log_df.select(
-#     regexp_extract('value', spend_time_pattern, 1).alias('spend_time'),
-#     regexp_extract('value', spend_time_pattern,  1).alias('spend_time'),
-#     regexp_extract('value', spend_time_pattern,  1).alias('spend_time'),
-# )
+performance_log_df = normal_log_df.select(
+    regexp_extract('value', ts_pattern, 1).alias('time'),
+    regexp_extract('value', spend_time_pattern, 1).alias('spend_time'),
+    regexp_extract('value', request_uri_pattern, 1).alias('request_uri'),
+    regexp_extract('value', max_memory_pattern, 1).alias('max_memory'),
+    regexp_extract('value', already_allow_memory_pattern, 1).alias('total_memory'),
+    regexp_extract('value', already_allow_memory_free_pattern, 1).alias('free_memory'),
+    regexp_extract('value', max_useful_memory_free_pattern, 1).alias('max_can_use_memory'),
+).withColumn("spend_time", regexp_replace('spend_time', '耗时：', ''))\
+    .withColumn("max_memory", regexp_replace('max_memory', '(最大内存: |m)', ''))\
+    .withColumn("total_memory", regexp_replace('total_memory', '(已分配内存: |m)', ''))\
+    .withColumn("free_memory", regexp_replace('free_memory', '(已分配内存中的剩余空间: |m)', ''))\
+    .withColumn("max_can_use_memory", regexp_replace('max_can_use_memory', '(最大可用内存: |m)', ''))\
+
+performance_log_df.show(10, truncate=False)
