@@ -1,6 +1,7 @@
 from pyspark.context import SparkContext
 from pyspark.sql.context import SQLContext
 from pyspark.sql.session import SparkSession
+import pyspark.sql.functions as F
 from pyspark.sql.functions import *
 import re
 import pandas as pd
@@ -12,7 +13,7 @@ sc = SparkContext()
 sqlContext = SQLContext(sc)
 spark = SparkSession(sc)
 
-raw_data_files = glob.glob('/Users/jackpan/JackPanDocuments/temporary/tet/edp.2021-11-29.out')
+raw_data_files = glob.glob('/Users/jackpan/JackPanDocuments/temporary/tet/edp.2021-12-02.out')
 base_df = spark.read.text(raw_data_files)
 normal_log_df = base_df.filter(base_df['value'].rlike(r'URI:.*最大内存:.*已分配内存:.*最大可用内存:.*'))
 
@@ -30,7 +31,7 @@ spend_time_pattern = r'(耗时：\d+:\d+:\d+\.\d+)'
 spend_time = [re.search(spend_time_pattern, item).group(1) for item in sample_normal_log]
 print(spend_time)
 
-request_uri_pattern = r'((\/\w+)+)'
+request_uri_pattern = r'((\/\w+\.?\d?)+)'
 request_uri_list = [re.search(request_uri_pattern, item).group(1) for item in sample_normal_log]
 print(request_uri_list)
 
@@ -73,16 +74,17 @@ performance_log_df = normal_log_df.select(
     regexp_extract('value', max_useful_memory_free_pattern, 1).alias('max_can_use_memory'),
 ).withColumn("spend_time", regexp_replace('spend_time', '耗时：', '')) \
     .withColumn("spend_time", count_seconds_udf('spend_time')) \
-    .withColumn("max_memory", regexp_replace('max_memory', '(最大内存: |m)', '')) \
-    .withColumn("total_memory", regexp_replace('total_memory', '(已分配内存: |m)', '')) \
-    .withColumn("free_memory", regexp_replace('free_memory', '(已分配内存中的剩余空间: |m)', '')) \
-    .withColumn("max_can_use_memory", regexp_replace('max_can_use_memory', '(最大可用内存: |m)', ''))
-
-
-# performance_log_df.show(10, truncate=False)
+    .withColumn("max_memory", regexp_replace('max_memory', '(最大内存: |m)', '').cast('int')) \
+    .withColumn("total_memory", regexp_replace('total_memory', '(已分配内存: |m)', '').cast('int')) \
+    .withColumn("free_memory", regexp_replace('free_memory', '(已分配内存中的剩余空间: |m)', '').cast('int')) \
+    .withColumn("max_can_use_memory", regexp_replace('max_can_use_memory', '(最大可用内存: |m)', '').cast('int')) \
+    .withColumn("used_memory", col('total_memory') - col('free_memory')) \
+    # performance_log_df.show(10, truncate=False)
 
 # performance_log_df.select(hour(col('time')).alias('hour'))\
 #     .groupBy('hour').count().orderBy('hour').show()
 
-performance_log_df.select(col('time')).groupBy(window(col('time'), '1 minutes')).count().orderBy('window').show(100, truncate=False)
+already_used_memory_df = performance_log_df.select(col('request_uri'),col('used_memory')).filter(~col('request_uri').startswith('/api/system/')) \
+    .groupBy('request_uri').agg(F.sum('used_memory').alias('used_memory_sum')).sort(desc('used_memory_sum'))
 
+# performance_log_df.select(col('time')).groupBy(window(col('time'), '1 minutes')).count().orderBy('window').show(100, truncate=False)
