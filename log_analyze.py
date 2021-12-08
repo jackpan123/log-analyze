@@ -17,8 +17,10 @@ spark = SparkSession(sc)
 # base_df = spark.read.text(raw_data_files)
 
 base_df = spark.read.parquet("/Users/jackpan/JackPanDocuments/temporary/out-log")
+base_df.show(10)
 normal_log_df = base_df.filter(base_df['word'].rlike(r'URI:.*最大内存:.*已分配内存:.*最大可用内存:.*'))
-
+print("=========")
+print(normal_log_df.count())
 sample_normal_log = [item['word'] for item in normal_log_df.take(15)]
 print(sample_normal_log)
 # date_time_pattern = r'\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3}'
