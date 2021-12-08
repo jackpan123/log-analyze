@@ -14,14 +14,17 @@ if __name__ == "__main__":
              .option("port", 9999)
              .load())
 
-    words = lines.select(F.split(F.col("value"), "\\s").alias("word"))
-    counts = words.groupBy("word").count()
+    # words = lines.select(F.split(F.col("value"), "\\s").alias("word"))
+    words = lines.select(F.split(F.col("value"), "\\n").cast("string").alias("word"))
+    logLines = words.filter(words["word"].rlike(r'URI:.*最大内存:.*已分配内存:.*最大可用内存:.*'))
     checkpointDir = "/Users/jackpan/JackPanDocuments/temporary/checkPointTest"
-    streamingQuery = (counts
+    outputDir = "/Users/jackpan/JackPanDocuments/temporary/out-log"
+    streamingQuery = (logLines
                       .writeStream
-                      .format("console")
-                      .outputMode("complete")
-                      .trigger(processingTime="1 second")
+                      .format("parquet")
+                      .option("path", outputDir)
+                      .outputMode("append")
+                      .trigger(processingTime="10 second")
                       .option("checkpointLocation", checkpointDir)
                       .start())
     streamingQuery.awaitTermination()

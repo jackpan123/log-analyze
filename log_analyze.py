@@ -13,11 +13,13 @@ sc = SparkContext()
 sqlContext = SQLContext(sc)
 spark = SparkSession(sc)
 
-raw_data_files = glob.glob('/Users/jackpan/JackPanDocuments/temporary/tet/edp.2021-12-02.out')
-base_df = spark.read.text(raw_data_files)
-normal_log_df = base_df.filter(base_df['value'].rlike(r'URI:.*最大内存:.*已分配内存:.*最大可用内存:.*'))
+# raw_data_files = glob.glob('/Users/jackpan/JackPanDocuments/temporary/tet/edp.2021-12-02.out')
+# base_df = spark.read.text(raw_data_files)
 
-sample_normal_log = [item['value'] for item in normal_log_df.take(15)]
+base_df = spark.read.parquet("/Users/jackpan/JackPanDocuments/temporary/out-log")
+normal_log_df = base_df.filter(base_df['word'].rlike(r'URI:.*最大内存:.*已分配内存:.*最大可用内存:.*'))
+
+sample_normal_log = [item['word'] for item in normal_log_df.take(15)]
 print(sample_normal_log)
 # date_time_pattern = r'\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3}'
 # date_time_list = [re.search(date_time_pattern, item).group(1) for item in sample_normal_log]
@@ -65,26 +67,27 @@ def count_seconds(col_name):
 
 count_seconds_udf = udf(lambda z: count_seconds(z), StringType())
 performance_log_df = normal_log_df.select(
-    regexp_extract('value', ts_pattern, 1).alias('time'),
-    regexp_extract('value', spend_time_pattern, 1).alias('spend_time'),
-    regexp_extract('value', request_uri_pattern, 1).alias('request_uri'),
-    regexp_extract('value', max_memory_pattern, 1).alias('max_memory'),
-    regexp_extract('value', already_allow_memory_pattern, 1).alias('total_memory'),
-    regexp_extract('value', already_allow_memory_free_pattern, 1).alias('free_memory'),
-    regexp_extract('value', max_useful_memory_free_pattern, 1).alias('max_can_use_memory'),
+    regexp_extract('word', ts_pattern, 1).alias('time'),
+    regexp_extract('word', spend_time_pattern, 1).alias('spend_time'),
+    regexp_extract('word', request_uri_pattern, 1).alias('request_uri'),
+    regexp_extract('word', max_memory_pattern, 1).alias('max_memory'),
+    regexp_extract('word', already_allow_memory_pattern, 1).alias('total_memory'),
+    regexp_extract('word', already_allow_memory_free_pattern, 1).alias('free_memory'),
+    regexp_extract('word', max_useful_memory_free_pattern, 1).alias('max_can_use_memory'),
 ).withColumn("spend_time", regexp_replace('spend_time', '耗时：', '')) \
     .withColumn("spend_time", count_seconds_udf('spend_time')) \
     .withColumn("max_memory", regexp_replace('max_memory', '(最大内存: |m)', '').cast('int')) \
     .withColumn("total_memory", regexp_replace('total_memory', '(已分配内存: |m)', '').cast('int')) \
     .withColumn("free_memory", regexp_replace('free_memory', '(已分配内存中的剩余空间: |m)', '').cast('int')) \
     .withColumn("max_can_use_memory", regexp_replace('max_can_use_memory', '(最大可用内存: |m)', '').cast('int')) \
-    .withColumn("used_memory", col('total_memory') - col('free_memory')) \
-    # performance_log_df.show(10, truncate=False)
-
+    .withColumn("used_memory", col('total_memory') - col('free_memory'))
+# performance_log_df.show(10, truncate=False)
+performance_log_df.show(10, truncate=False)
 # performance_log_df.select(hour(col('time')).alias('hour'))\
 #     .groupBy('hour').count().orderBy('hour').show()
 
-already_used_memory_df = performance_log_df.select(col('request_uri'),col('used_memory')).filter(~col('request_uri').startswith('/api/system/')) \
-    .groupBy('request_uri').agg(F.sum('used_memory').alias('used_memory_sum')).sort(desc('used_memory_sum'))
+# already_used_memory_df = performance_log_df.select(col('request_uri'), col('used_memory')).filter(
+#     ~col('request_uri').startswith('/api/system/')) \
+#     .groupBy('request_uri').agg(F.sum('used_memory').alias('used_memory_sum')).sort(desc('used_memory_sum'))
 
 # performance_log_df.select(col('time')).groupBy(window(col('time'), '1 minutes')).count().orderBy('window').show(100, truncate=False)
